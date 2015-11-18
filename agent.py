@@ -28,7 +28,6 @@ class PingAPI(Resource):
         @apiSuccessExample Success response
             HTTP/1.1 200 OK
         """
-
         return
 
 
@@ -54,14 +53,20 @@ class SiteListAPI(Resource):
         @apiExample Example:
             GET /config/site?allAvailable=True
 
-        @apiSuccessExample Success response
+        @apiSuccessExample Success response, retrieving all the sites
             HTTP/1.1 200 OK
             {
                 'sites': ['default', 'site1', 'site2'],
-                'allAvailable': True
+                'allAvailable': true
+            }
+
+        @apiSuccessExample Success response, retrieving only the enabled sites
+            HTTP/1.1 200 OK
+            {
+                'sites': ['default'],
+                'allAvailable': false
             }
         """
-
         args = self.reqparse.parse_args()
 
         list_all_sites_available = args['allAvailable']
