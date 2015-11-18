@@ -39,7 +39,7 @@ class SiteListAPI(Resource):
 
     def get(self):
         """
-        @api {get} /config/site Retrieve the list of the sites.
+        @api {get} /config/site Get the list of the sites.
 
         @apiName GetListSites
         @apiDescription Get the list of the sites on the Agent, either activated (= in 'enabled' directory) or not (= in 'available' directory).
@@ -47,7 +47,7 @@ class SiteListAPI(Resource):
 
         @apiParam {Boolean} [allAvailable=False] Should list all the available (not necessarily enabled) sites.
 
-        @apiSuccess (200) {List} sites List of the available or enabled sites.
+        @apiSuccess (200) {List}    sites        List of the available or enabled sites.
         @apiSuccess (200) {Boolean} allAvailable Copy of the paramater 'allAvailable' received in the query.
 
         @apiExample Example:
@@ -85,9 +85,57 @@ class SiteConfigAPI(Resource):
         super(SiteConfigAPI, self).__init__()
 
     def get(self, site_name):
+        """
+        @api {get} /config/site/:site_name Get a configuration.
+
+        @apiName GetSiteConfig
+        @apiDescription Retrieve the configuration of a site.
+        @apiGroup Configuration
+
+        @apiParam {String} site_name Name of the site.
+
+        @apiSuccess (200) {String} config   Configuration of the site.
+
+        @apiExample Example:
+            GET /config/site/default
+
+        @apiSuccessExample Success response
+            HTTP/1.1 200 OK
+            {
+                'config': "Configuration of the site"
+            }
+
+        """
         return { 'config': IO.site_config(site_name) }
 
     def post(self, site_name):
+        """
+        @api {post} /config/site/:site_name Push a configuration.
+
+        @apiName PushSiteConfig
+        @apiDescription Create or replace a configuration for a site.
+        @apiGroup Configuration
+
+        @apiParam {String} site_name Name of the site.
+        @apiParam {String}   config    Configuration of the site.
+
+        @apiSuccess (200) {int} state   Status of the operation, 1 if everything went well.
+
+        @apiExample Example:
+            POST /config/site/default
+
+        @apiParamExample {json} Configuration example:
+            {
+                'config': "Configuration..."
+            }
+
+        @apiSuccessExample Success response
+            HTTP/1.1 200 OK
+            {
+                'state': 1
+            }
+
+        """
         args = self.reqparse.parse_args()
         config = args['config']
 
