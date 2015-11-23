@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 
+import subprocess
 import sys
 from flask import Flask, request
 from flask.ext.restful import Api, Resource, reqparse
@@ -11,6 +12,10 @@ from IO.IO import IO
 app = Flask(__name__)
 api = Api(app)
 
+def reload_nginx():
+    p = subprocess.Popen(["sudo service nginx restart"], stdout=subprocess.PIPE, shell=True)
+    (output, err) = p.communicate()
+    pass
 
 class PingAPI(Resource):
 
@@ -82,6 +87,7 @@ class SiteConfigAPI(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('config', type=str, location='json')
+        self.reqparse.add_argument('enable', type=str, location='json')
         super(SiteConfigAPI, self).__init__()
 
     def get(self, site_name):
@@ -113,11 +119,12 @@ class SiteConfigAPI(Resource):
         @api {post} /config/site/:site_name Push a configuration.
 
         @apiName PushSiteConfig
-        @apiDescription Create or replace a configuration for a site.
+        @apiDescription Create a configuration for a site.
         @apiGroup Configuration
 
         @apiParam {String} site_name Name of the site.
         @apiParam {String}   config    Configuration of the site.
+        @apiParam {String}   enable    Activate the configuration.
 
         @apiSuccess (200) {int} state   Status of the operation, 1 if everything went well.
 
@@ -126,7 +133,59 @@ class SiteConfigAPI(Resource):
 
         @apiParamExample {json} Configuration example:
             {
-                'config': "Configuration..."
+                'config': "Configuration...",
+                'enable': "True"
+            }
+
+        @apiSuccessExample Success response
+            HTTP/1.1 200 OK
+            {
+                'state': 1
+            }
+
+        """
+        args = self.reqparse.parse_args()
+
+        config = args['config']
+        enable = args['enable']
+
+        if enable is not None:
+            enable = (enable.lower() == "true")
+        else:
+            enable = False
+
+        IO.create_site_config(site_name, config)
+
+        if enable:
+            IO.enable_config(site_name)
+        else:
+            IO.disable_config(site_name)
+
+        reload_nginx()
+
+        return { 'state': 1 }
+
+    def put(self, site_name):
+        """
+        @api {put} /config/site/:site_name Update a configuration.
+
+        @apiName UpdateSiteConfig
+        @apiDescription Replace a configuration for a site.
+        @apiGroup Configuration
+
+        @apiParam {String} site_name Name of the site.
+        @apiParam {String}   config    Configuration of the site.
+        @apiParam {String}   enable    Activate the configuration.
+
+        @apiSuccess (200) {int} state   Status of the operation, 1 if everything went well.
+
+        @apiExample Example:
+            PUT /config/site/default
+
+        @apiParamExample {json} Configuration example:
+            {
+                'config': "Configuration...",
+                'enable': "True"
             }
 
         @apiSuccessExample Success response
@@ -138,10 +197,24 @@ class SiteConfigAPI(Resource):
         """
         args = self.reqparse.parse_args()
         config = args['config']
+        enable = args['enable']
 
-        IO.create_site_config(site_name, config)
+        if enable is not None:
+            enable = enable.lower() == "true"
+        else:
+            enable = False
+
+        IO.update_site_config(site_name, config)
+        print(enable)
+        if enable:
+            IO.enable_config(site_name)
+        else:
+            IO.disable_config(site_name)
+
+        reload_nginx()
 
         return { 'state': 1 }
+
 
 
 api.add_resource(PingAPI, '/')
