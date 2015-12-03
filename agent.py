@@ -4,18 +4,32 @@ from __future__ import print_function
 
 import subprocess
 import sys
+import argparse
+import pam
+
 from flask import Flask, request
-from flask.ext.restful import Api, Resource, reqparse
+from flask.ext.restful import Api, Resource, reqparse, abort
+from flask.ext.httpauth import HTTPBasicAuth
+from passlib.apps import custom_app_context as pwd_context
 
 from IO.IO import IO
 
 app = Flask(__name__)
 api = Api(app)
 
+auth = HTTPBasicAuth()
+
+# The credentials <User; Password> will be the same as the system on which the Agent is run.
+@auth.verify_password
+def verify_password(username, password):
+    return pam.authenticate(username, password)
+
+
 def reload_nginx():
     p = subprocess.Popen(["sudo service nginx restart"], stdout=subprocess.PIPE, shell=True)
     (output, err) = p.communicate()
     pass
+
 
 class PingAPI(Resource):
 
@@ -33,10 +47,12 @@ class PingAPI(Resource):
         @apiSuccessExample Success response
             HTTP/1.1 200 OK
         """
-        return
+        return 'Reached!'
 
 
 class SiteListAPI(Resource):
+    decorators = [auth.login_required]
+
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('allAvailable', type=str, location='args')
@@ -80,10 +96,13 @@ class SiteListAPI(Resource):
         else:
             list_all_sites_available = False
 
-        return { 'sites': IO.list_available_sites() if list_all_sites_available else IO.list_enabled_sites(),
+        return {'sites': IO.list_available_sites() if list_all_sites_available else IO.list_enabled_sites(),
                  'allAvailable': list_all_sites_available}
 
+
 class SiteConfigAPI(Resource):
+    decorators = [auth.login_required]
+
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('config', type=str, location='json')
@@ -111,8 +130,21 @@ class SiteConfigAPI(Resource):
                 'config': "Configuration of the site"
             }
 
+        @apiError SiteNotFound The configuration does not exist.
+
+        @apiErrorExample {json} Error-Response:
+         HTTP/1.1 404 Not Found
+         {
+           "error": "SiteNotFound"
+         }
+
         """
-        return { 'config': IO.site_config(site_name) }
+        try:
+            config = IO.site_config(site_name)
+        except Exception as e:
+            abort(404)
+
+        return { 'config': config }
 
     def post(self, site_name):
         """
@@ -216,15 +248,51 @@ class SiteConfigAPI(Resource):
         return { 'state': 1 }
 
 
+class ConfigDirAPI(Resource):
+    decorators = [auth.login_required]
+
+    def __init__(self):
+        self.reqparse = reqparse.RequestParser()
+        self.reqparse.add_argument('path', type=str, location='json')
+        super(ConfigDirAPI, self).__init__()
+
+    def put(self, site_name):
+        default_path = "/etc/nginx"
+        args = self.reqparse.parse_args()
+        path = args['path']
+
+        if path is None:
+            path = default_path
+
+        IO.set_nginx_dir(path)
+
+        return { 'state': 1 }
+
+
+class GetIPAPI(Resource):
+    def get(self):
+        return {'ip': request.remote_addr}
+
 
 api.add_resource(PingAPI, '/')
 api.add_resource(SiteListAPI, '/config/site')
 api.add_resource(SiteConfigAPI, '/config/site/<site_name>')
+api.add_resource(ConfigDirAPI, '/config/nginx/directory')
+api.add_resource(GetIPAPI, '/ip')
+
+
+def run_agent(ip, https=False):
+    if https:
+        app.run(debug=True, host=ip, ssl_context=('server.crt', 'server.key'))
+    else:
+        app.run(debug=True, host=ip)
+
 
 if __name__ == "__main__":
-    ip = "127.0.0.1"
+    parser = argparse.ArgumentParser(description="Run the agent for the NGINX device package.")
+    parser.add_argument('--ip', action='store', help='ip of the agent', default='127.0.0.1')
+    parser.add_argument('--https', action='store_true', default=False, help='use HTTPS')
 
-    if len(sys.argv) > 1:
-        ip = sys.argv[1]
+    args = parser.parse_args()
 
-    app.run(debug=True, host=ip)
+    run_agent(args.ip, args.https)
