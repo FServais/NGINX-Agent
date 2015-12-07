@@ -7,22 +7,24 @@ import sys
 import argparse
 import pam
 
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask.ext.restful import Api, Resource, reqparse, abort
 from flask.ext.httpauth import HTTPBasicAuth
 from passlib.apps import custom_app_context as pwd_context
 
+from Exceptions import get_exception_dict, SiteListNotAvailable, SiteNotFound, UnableToPushConfiguration
 from IO.IO import IO
 
 app = Flask(__name__)
-api = Api(app)
+api = Api(app, errors=get_exception_dict())
 
 auth = HTTPBasicAuth()
 
-# The credentials <User; Password> will be the same as the system on which the Agent is run.
+
 @auth.verify_password
 def verify_password(username, password):
-    return pam.authenticate(username, password)
+    # The credentials <User; Password> will be the same as the system on which the Agent is run.
+    return pam.authenticate(username, password, service='system-auth')
 
 
 def reload_nginx():
@@ -48,6 +50,7 @@ class PingAPI(Resource):
             HTTP/1.1 200 OK
         """
         return 'Reached!'
+
 
 
 class SiteListAPI(Resource):
@@ -96,7 +99,12 @@ class SiteListAPI(Resource):
         else:
             list_all_sites_available = False
 
-        return {'sites': IO.list_available_sites() if list_all_sites_available else IO.list_enabled_sites(),
+        status, sites = IO.list_available_sites() if list_all_sites_available else IO.list_enabled_sites()
+
+        if status is False:
+            raise SiteListNotAvailable()
+
+        return {'sites': sites,
                  'allAvailable': list_all_sites_available}
 
 
@@ -135,16 +143,18 @@ class SiteConfigAPI(Resource):
         @apiErrorExample {json} Error-Response:
          HTTP/1.1 404 Not Found
          {
-           "error": "SiteNotFound"
+           "status": 404
+           "message": "Site not found."
          }
 
         """
-        try:
-            config = IO.site_config(site_name)
-        except Exception as e:
-            abort(404)
 
-        return { 'config': config }
+        status, config = IO.site_config(site_name)
+
+        if status is False:
+            raise SiteNotFound()
+
+        return {'config': config}
 
     def post(self, site_name):
         """
@@ -186,7 +196,9 @@ class SiteConfigAPI(Resource):
         else:
             enable = False
 
-        IO.create_site_config(site_name, config)
+        result = IO.create_site_config(site_name, config)
+        if result is not True:
+            raise UnableToPushConfiguration()
 
         if enable:
             IO.enable_config(site_name)
@@ -195,7 +207,7 @@ class SiteConfigAPI(Resource):
 
         reload_nginx()
 
-        return { 'state': 1 }
+        return {'state': 1}
 
     def put(self, site_name):
         """
@@ -236,7 +248,10 @@ class SiteConfigAPI(Resource):
         else:
             enable = False
 
-        IO.update_site_config(site_name, config)
+        result = IO.update_site_config(site_name, config)
+        if result is not True:
+            raise UnableToPushConfiguration()
+
         print(enable)
         if enable:
             IO.enable_config(site_name)
@@ -245,7 +260,7 @@ class SiteConfigAPI(Resource):
 
         reload_nginx()
 
-        return { 'state': 1 }
+        return {'state': 1}
 
 
 class ConfigDirAPI(Resource):

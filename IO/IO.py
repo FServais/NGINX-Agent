@@ -17,23 +17,42 @@ class IO:
 
     @classmethod
     def list_enabled_sites(cls):
-        return cls.list_files(cls.__NGINX_DIR+cls.__SITES_ENABLED_DIR)
+        try:
+            return True, cls.list_files(cls.__NGINX_DIR+cls.__SITES_ENABLED_DIR)
+        except Exception as e:
+            return False, e.message
 
     @classmethod
     def list_available_sites(cls):
-        return cls.list_files(cls.__NGINX_DIR+cls.__SITES_AVAILABLE_DIR)
+        try:
+            return True, cls.list_files(cls.__NGINX_DIR+cls.__SITES_AVAILABLE_DIR)
+        except Exception as e:
+            return False, e.message
 
     @classmethod
     def site_config(cls, site_name):
-        return cls.read_file(cls.__NGINX_DIR + cls.__SITES_AVAILABLE_DIR + '/' + site_name)
+        try:
+            return True, cls.read_file(cls.__NGINX_DIR + cls.__SITES_AVAILABLE_DIR + '/' + site_name)
+        except Exception as e:
+            return False, e.message
 
     @classmethod
     def create_site_config(cls, site_name, config):
-        return cls.create_file(cls.__NGINX_DIR + cls.__SITES_AVAILABLE_DIR + '/' + site_name, config)
+        try:
+            cls.create_file(cls.__NGINX_DIR + cls.__SITES_AVAILABLE_DIR + '/' + site_name, config)
+        except Exception as e:
+            return e.message
+
+        return True
 
     @classmethod
     def update_site_config(cls, site_name, config):
-        return cls.update_file(cls.__NGINX_DIR + cls.__SITES_AVAILABLE_DIR + '/' + site_name, config)
+        try:
+            cls.update_file(cls.__NGINX_DIR + cls.__SITES_AVAILABLE_DIR + '/' + site_name, config)
+        except Exception as e:
+            return e.message
+
+        return True
 
     @classmethod
     def enable_config(cls, config_name):
@@ -71,17 +90,7 @@ class IO:
         with open(path_to_file, 'w+') as f:
             f.write(content)
 
-        return 1
-
     @classmethod
     def update_file(cls, path_to_file, content):
         with open(path_to_file, 'w') as f:
             f.write(content)
-
-        return 1
-
-if __name__ == "__main__":
-    print("Enabled: {}".format(IO.list_enabled_sites()))
-    print("Available: {}".format(IO.list_available_sites()))
-
-    print("Content of 'default': {}".format(IO.site_config("default")))
