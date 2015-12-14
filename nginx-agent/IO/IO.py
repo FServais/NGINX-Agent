@@ -1,5 +1,6 @@
 import subprocess
 from os import walk
+from os.path import exists
 
 class IO:
     __NGINX_DIR = '/etc/nginx'
@@ -64,8 +65,11 @@ class IO:
     @classmethod
     def disable_config(cls, config_name):
         enable_path = cls.__NGINX_DIR + cls.__SITES_ENABLED_DIR + '/' + config_name
-        p = subprocess.Popen(["rm " + enable_path], stdout=subprocess.PIPE, shell=True)
-        output, err = p.communicate()
+
+        if cls.file_exists(enable_path):
+            p = subprocess.Popen(["rm " + enable_path], stdout=subprocess.PIPE, shell=True)
+            output, err = p.communicate()
+
 
     # Generic methods
 
@@ -94,3 +98,7 @@ class IO:
     def update_file(cls, path_to_file, content):
         with open(path_to_file, 'w') as f:
             f.write(content)
+
+    @classmethod
+    def file_exists(self, path_to_file):
+        return exists(path_to_file)
