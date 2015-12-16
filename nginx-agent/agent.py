@@ -3,14 +3,13 @@
 from __future__ import print_function
 
 import subprocess
-import sys
+import ssl
 import argparse
 import pam
 
 from flask import Flask, request, jsonify
 from flask.ext.restful import Api, Resource, reqparse, abort
 from flask.ext.httpauth import HTTPBasicAuth
-from passlib.apps import custom_app_context as pwd_context
 
 from Exceptions import get_exception_dict, SiteListNotAvailable, SiteNotFound, UnableToPushConfiguration
 from IO.IO import IO
@@ -298,6 +297,9 @@ api.add_resource(GetIPAPI, '/ip')
 
 def run_agent(ip, https=False):
     if https:
+        # context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        # context.use_privatekey_file('../server.key')
+        # context.use_certificate_file('../server.crt')
         app.run(debug=True, host=ip, ssl_context=('server.crt', 'server.key'))
     else:
         app.run(debug=True, host=ip)
