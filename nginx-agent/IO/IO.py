@@ -59,8 +59,10 @@ class IO:
     def enable_config(cls, config_name):
         avail_path = cls.__NGINX_DIR + cls.__SITES_AVAILABLE_DIR + '/' + config_name
         enable_path = cls.__NGINX_DIR + cls.__SITES_ENABLED_DIR + '/' + config_name
-        p = subprocess.Popen(["ln -s " + avail_path + " " + enable_path], stdout=subprocess.PIPE, shell=True)
-        output, err = p.communicate()
+
+        if not cls.file_exists(enable_path):
+            p = subprocess.Popen(["ln -s " + avail_path + " " + enable_path], stdout=subprocess.PIPE, shell=True)
+            output, err = p.communicate()
 
     @classmethod
     def disable_config(cls, config_name):
